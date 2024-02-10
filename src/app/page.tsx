@@ -1,20 +1,19 @@
 'use client'
-import { useState } from 'react'
-
-type Todo = {
-  id: number
-  title: string
-  completed: boolean
-}
-
-const todos: Todo[] = [
-  { id: 1, title: 'todo1', completed: false },
-  { id: 2, title: 'todo2', completed: false },
-  { id: 3, title: 'todo3', completed: true },
-]
+import { Todo } from '@prisma/client'
+import { useEffect, useState } from 'react'
 
 export default function Home() {
   const [inputValue, setInputValue] = useState<string | null>(null)
+  const [todos, setTodos] = useState<Todo[]>([])
+
+  useEffect(() => {
+    const getTodo = async () => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/todo`)
+      const todos = await response.json()
+      setTodos(todos)
+    }
+    getTodo()
+  }, [])
 
   return (
     <div className='container mx-auto p-4'>
@@ -28,7 +27,28 @@ export default function Home() {
             <input
               type='checkbox'
               checked={todo.completed}
-              onChange={() => console.log('completedを更新する処理')}
+              onChange={async () => {
+                const response = await fetch(
+                  `${process.env.NEXT_PUBLIC_API_URL}/todo/${todo.id}`,
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ completed: todo.completed }),
+                  }
+                )
+                const updateTodo = await response.json()
+                setTodos(
+                  todos.map((todo) => {
+                    if (todo.id === updateTodo.id) {
+                      return updateTodo
+                    } else {
+                      return todo
+                    }
+                  })
+                )
+              }}
               className='mr-2'
             />
             <p className={`text-black ${todo.completed ? 'line-through' : ''}`}>
@@ -36,7 +56,17 @@ export default function Home() {
             </p>
           </div>
           <button
-            onClick={() => console.log('削除する処理')}
+            onClick={async (e) => {
+              e.preventDefault()
+              const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/todo/${todo.id}`,
+                {
+                  method: 'DELETE',
+                }
+              )
+              const deleteTodo = await response.json()
+              setTodos(todos.filter((todo) => todo.id !== deleteTodo.id))
+            }}
             className='bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded'
           >
             削除
@@ -44,7 +74,24 @@ export default function Home() {
         </div>
       ))}
       <form
-        onSubmit={() => console.log('追加する処理')}
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (!inputValue) alert('入力してください')
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/todo`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ title: inputValue }),
+            }
+          )
+          const newTodo = await response.json()
+
+          setTodos([...todos, newTodo])
+          setInputValue(null)
+        }}
         className='flex items-center mt-4'
       >
         <input
